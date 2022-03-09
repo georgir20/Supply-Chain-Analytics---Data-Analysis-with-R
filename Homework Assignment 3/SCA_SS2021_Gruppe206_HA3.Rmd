@@ -1,0 +1,625 @@
+---
+title: "HA3_Markt2"
+author: "Carlo Schmid, Ronny Georgi"
+date: "06/03/2021"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Hausaufgabe 3 - Markt 2
+
+Import der CSV-Dateien
+```{r}
+rm(list = ls())
+transaktionen = read.csv2("output_transactions_8Players_v0013.csv")
+service = read.csv2("output_services_8Players_v0013.csv")
+preise = read.csv2("output_prices_8Players_v0013.csv")
+kosten = read.csv2("output_cost_8Players_v0013.csv")
+externals = read.csv2("externals13.csv")
+
+```
+
+Laden von Packages
+```{r}
+
+library("dummies")
+library("ggplot2")
+library("Metrics")
+library(dplyr)
+```
+
+## Aufgabe 2.1
+  
+### (1)
+Laden Sie die Datensaetze externals und services. Berechnen Sie ueber den gesamten Datensatz services, d.h. fuer jede durchgefuehrte Dienstleistung, den On‐Time‐Delivery (OTD) Status (d.h. 0 oder FALSE, wenn unpuenktlich; 1 oder TRUE wenn puenktlich) sowie die Item Fill Rate (IFR). Stellen Sie an‐ schliessend jeweils die Kennzahlen der durchschnittlichen OTD‐Rate und der durchschnittlichen Item Fill Rate als Kennzahl je Logistikdienstleister aggregiert dar. Geben Sie diese Werte in zwei Tabellen aus. Die Tabellen sollen einen einfachen Vergleich der LDL ermöglichen. Bewertungsrelevant: Output, Code.
+
+Hinweis: Erneut bietet es sich an, eine Variable Periode dem Datensatz hinzu zu fuegen, welche aus Jahr und Monat besteht (im Format YYYYMM, z.B. Februar 2014 –> 201402)
+
+```{r}
+# Laden der Daten:
+service = read.csv2("output_services_8Players_v0013.csv")
+externals = read.csv2("externals13.csv")
+
+# Berechnen der OTD:
+service$OTD = service$DaysExecuted <= service$DaysScheduled
+
+# Berechnen der IFR:
+service$IFR = service$QExecuted / service$QScheduled
+
+# Berechnen der durchschnittlichen aggregierten IFR:
+vendorIFR = aggregate(IFR ~ vendor, data = service, mean)
+
+# Berechnen der durchschnittlichen aggregierten OTD pro Logistikdienstleister
+vendorOTD = aggregate(OTD ~ vendor, data = service, mean)
+
+# Erstellen einer Tabelle fuer IFR in der Kennzahlen absteigend und nur 
+# relevante Daten enthalten sind
+vendorIFR_sorted = subset(vendorIFR[order(vendorIFR$IFR, decreasing = TRUE),], IFR!=1)
+
+# Entfernen der Zeilennummer
+rownames(vendorIFR_sorted) = NULL
+
+# Erzeugung eines dataframes
+df_IFR = data.frame(Logistikdienstleister_Warehousing = vendorIFR_sorted$vendor, 
+                    IFR = vendorIFR_sorted$IFR)
+
+# die OTD-Werte auf 3 Nachkommastellen runden:
+library(dplyr)
+df_IFR %>% 
+ mutate_if(is.numeric, round, digits=3)
+
+# Erstellen einer Tabelle fuer IFR in der Kennzahlen absteigend und nur
+# relevante Daten enthalten sind
+vendortOTD_sort = subset(vendorOTD[order(vendorOTD$OTD, decreasing = TRUE),], OTD!=1) 
+
+# Entfernen der Zeilennummer
+rownames(vendortOTD_sort) = NULL
+
+# Erzeugung eines dataframes
+df_OTD = data.frame(Logistikdienstleister_Shipping = vendortOTD_sort$vendor, 
+                    OTD_Rate = vendortOTD_sort$OTD)
+
+# Runden der OTD-Werte auf 3 Nachkommastellen (da die Werte sehr nah bei einander liegen 
+# reicht eine Rundung auf 2 Nachkommastellen nicht für einen Vergleich aus)
+df_OTD %>% 
+ mutate_if(is.numeric, round, digits=3)
+
+```
+
+### (2)
+Erzeugen Sie ein neues Dataframe, welches die aggregierte IFR je Warehousing‐Logistikdienstleister enthaelt. Die IFR soll je LDL (nur Warehousing), Region und Periode (eine Periode = ein Monat eines einzelnen Jahres) aggregiert werden. Geben Sie anschliessend den IFR‐Wert (und die entsprechende Periode) aus, den der beste Warehousing‐DL in seiner schlechtesten Periode in der Region Peking erreicht hat. Bewertungsrelevant: Output, Code.
+
+```{r}
+# Erstellen einer Periode
+service$Period = sprintf("%1.0f/%02d",service$Year, service$Month)
+
+# Erstellen eines Dataframes in der die aggregierte IFR je WH-DL über Region und Periode 
+# angezeigt wird
+WH_IFR = aggregate(IFR ~ vendor + region + Period, 
+                                  data = subset(service, service=="Warehousing"), mean)
+
+WH_IFR
+
+WH_IFR_vendors = aggregate(IFR ~ vendor, data = subset(service, service=="Warehousing"), mean)
+best_vendor_IFR = max(WH_IFR_vendors[,c("IFR")])
+best_vendor = WH_IFR_vendors[WH_IFR_vendors$IFR == best_vendor_IFR,c("vendor")]
+
+bv_IFR_peking = subset(WH_IFR, vendor==best_vendor & region=="Peking")
+bv_min_IFR_peking = min(bv_IFR_peking[,c("IFR")])
+bv_min_IFR_peking_periode = bv_IFR_peking[bv_IFR_peking$IFR == bv_min_IFR_peking,c("Period")]
+bv_min_IFR_peking_periode 
+
+
+cat(best_vendor,"hat insgesamt die höchste IFR und ist damit der beste LDL für Warehousing.\n")
+cat("Der LDL",best_vendor,"hat in Peking seine geringste IFR in der Periode",bv_min_IFR_peking_periode,".\n")
+cat("Dort beträgt die IFR",round(bv_min_IFR_peking*100,1),"%.\n")
+  
+```
+
+### (3)
+Erzeugen Sie ein neues Dataframe, welches die aggregierte OTD je Shipping‐Logistikdienstleister enthaelt. Die OTD soll je LDL (nur Shipping), Region und Periode (eine Periode = ein Monat eines einzelnen Jahres) aggregiert werden. Geben Sie anschliessend den OTD‐Wert (und die entsprechende Periode) aus, den der schlechteste Shipping‐DL in seiner besten Periode in der Region Peking erreicht hat. Bewertungsrelevant: Output, Code.
+
+```{r}
+# Erzeugen von dataframe mit OTD für alle Shipping-Dienstleister
+SH_OTD = aggregate(OTD ~ vendor + region + Period, 
+                                  data = subset(service, service=="Shipping"), mean)
+SH_OTD
+
+SH_OTD_vendors = aggregate(OTD ~ vendor, data = subset(service, service=="Shipping"), mean)
+worst_vendor_OTD = min(SH_OTD_vendors[,c("OTD")])
+worst_vendor = SH_OTD_vendors[SH_OTD_vendors$OTD == worst_vendor_OTD,c("vendor")]
+
+wv_OTD_peking = subset(SH_OTD, vendor==worst_vendor & region=="Peking")
+wv_max_OTD_peking = max(wv_OTD_peking[,c("OTD")])
+wv_max_OTD_peking_periode = wv_OTD_peking[wv_OTD_peking$OTD == wv_max_OTD_peking,c("Period")]
+
+cat(worst_vendor,"hat insgesamt die niedrigste OTD und ist damit der schlechteste LDL für Shipping.\n")
+cat("Der LDL",worst_vendor,"hat in Peking seine höchste IFR in der Periode",wv_max_OTD_peking_periode,".\n")
+cat("Dort beträgt die OTD",round(wv_max_OTD_peking*100,1),"%.\n")
+```
+
+### (4)
+Waehlen Sie den Warehousing‐DL “AHL Express Warehousing” aus. Vereinigen Sie das eben erzeugte DataFrame (genauer: Ein Subset dieses Dataframes bezueglich des gewaehlten Warehousing‐DL) mit den externen Faktoren der jeweiligen Periode und Region in einem neuen Dataframe. Zeigen Sie davon den Tabellenkopf. Bewertungsrelevant: Output.
+Hinweis: In der Funktion merge() koennen mehrere ueberschneidende Spalten genutzt werden, indem dem “by =”‐Parameter ein Vektor der Spalten uebergeben wird. Ihnen steht frei, andere Funktionen zu verwenden.
+
+```{r}
+AHL= subset(WH_IFR, vendor=="AHL Express Warehousing")
+AHL
+externals
+
+AHL_externals = merge(AHL,externals[externals$Year!="2021",])
+
+AHL_externals = AHL_externals [, c((1:4), (8:29))]
+
+head(AHL_externals)
+```
+
+### (5)
+Sie moechten sich eine Uebersicht zu der Korrelation zwischen den externen Faktoren und der IFR des Warehousing‐Dienstleister schaffen. Fuehren Sie dazu die folgenden Schritte aus:
+
+(a) Geben Sie eine unsortierte Tabelle aus, in der die externen Effekte und deren Korrelation zur IFR
+abgebildet sind.
+```{r}
+
+# Korrelation zwischen externen Effekten und IFR herstellen 
+Correlation_Externals = cor(AHL_externals[, c(4:26)])
+
+Cor_IFR_sub = Correlation_Externals[, c(0:2)]
+
+Cor_IFR_sub
+
+
+
+```
+
+
+(b) Geben Sie eine Tabelle aus, in der die 5 am starksten zur IFR korrelierenden externen Effekten und deren
+Korrelation zur IFR abgebildet sind.
+
+```{r}
+cor_Strong = data.frame(Cor_IFR_sub[c(rownames(data.frame(sort(abs(Cor_IFR_sub[,1]),TRUE)[2:6]))),1])
+colnames(cor_Strong) = c("Correlation to IFR")
+round(cor_Strong,3)
+
+```
+
+(c) Erstellen Sie ein Korrelations‐Plot fuer diese 5 externen Faktoren. Bewertungsrelevant: Output.
+
+```{r}
+library("GGally")
+
+ggpairs(AHL_externals[, c(rownames(cor_Strong),"IFR")],
+# ohne Visualisierung des Fortschritts der Erstellung des plots
+progress = FALSE,
+# mit Visualisierung einer Glaettungslinie und Aenderung der Farbe der Punkte,
+#damit Linie erkennbar
+lower = list(continuous = wrap("smooth_loess", colour = "steelblue1")))
+
+
+
+```
+
+### (6)
+Sie moechten nun eine Lineare Regression durchfuehren, um die IFR mit Hilfe der externen Effekte vorherzusagen. Um die Guete Ihrer Modelle vergleichen zu koennen, benoetigen Sie eine geeignete Baseline. Erzeugen Sie eine sinnvolle Baseline in dem DataFrame zu Ihrem gewaehlten Warehousing‐DL in einer Variable Baseline. Begruenden Sie Ihre Wahl. Geben Sie von dem DataFrame den Tabellenkopf aus. Geben Sie Sie nur die Spalten ‘Periode’, ‘Region’, ‘IFR’ und ‘Baseline’ aus. Bewertungsrelevant: Output, Begruendung.
+
+```{r}
+# Baseline durch Mittelwert erzeugen und Ausgabe in einem neuen Dataframe
+AHL_externals$Baseline = mean(AHL_externals$IFR)
+
+df_base = head(AHL_externals[, c("Period", "region", "IFR","Baseline")])
+
+df_base %>% 
+ mutate_if(is.numeric, round, digits=3)
+
+
+```
+Begründung: Wir können hier den Durchschnitt der IFR als Baseline benutzen, da der Durchschnitt unabhängig von den externen Effekten ist und auch grafisch gut darstellbar ist.
+
+
+
+### (7)
+Visualisieren Sie die Baseline Ihres gewaehlten LDL fuer den Zeitraum von 2016 bis 2020 sowie die IFR in der Region Peking und die IFR in der Region Shanghai. Bewertungsrelevant: Output.
+
+```{r}
+
+# Subset fuer die Region Shanghai erstellen
+AHL_externals_Shang= subset(AHL_externals, region=="Shangh")
+
+# Erzeugung Liniendiagramm
+ggplot(data=AHL_externals_Shang, aes(ymin = 0.75, ymax = 0.95)) +
+# Hinufügen von IFR und Baseline
+geom_line(data=AHL_externals_Shang, aes(x=seq(1,length(Period),1), y=IFR,
+colour = 'IFR')) +
+# Zweite Linie hinzufuegen (Baseline)
+geom_line(data=AHL_externals_Shang, aes(x=seq(1,length(Period),1), y=Baseline,
+colour = 'Baseline')) +
+labs(x = "Jahr", title="IFR-Verlauf von CPS Warehousing in Shanghai") +
+scale_x_continuous(breaks = c(1,13,25,37,49, 61),
+labels = c("2016","2017","2018","2019", "2020", "2021"))
+
+
+# Subset fuer die Region Peking erstellen
+AHL_externals_Peking = subset(AHL_externals, region=="Peking")
+
+# Erzeugung Liniendiagramm
+ggplot(data=AHL_externals_Peking, aes(ymin = 0.75, ymax = 0.95)) +
+# Hinufügen von IFR und Baseline
+geom_line(data=AHL_externals_Peking, aes(x=seq(1,length(Period),1), y=IFR,
+colour = 'IFR')) +
+# Zweite Linie hinzufuegen (Baseline)
+geom_line(data=AHL_externals_Peking, aes(x=seq(1,length(Period),1), y=Baseline,
+colour = 'Baseline')) +
+labs(x = "Jahr", title="IFR-Verlauf von CPS Warehousing in Peking") +
+scale_x_continuous(breaks = c(1,13,25,37,49, 61),
+labels = c("2016","2017","2018","2019", "2020", "2021"))
+
+
+
+
+
+
+```
+
+### (8)
+Bewerten Sie die Baseline fuer Ihren gewaehlten Warehousing‐Logistikdienstleister nach MAE und MAPE. Bewertungsrelevant:
+Output.
+Hinweis: Es bietet sich an, die Werte der Bewertungen in einem Dataframe ‘evaluation’ zu speichern.
+
+
+```{r}
+# DataFrame erzeugen, das mit den werten der Modellbewertung später gefüllt wird
+evaluation = data.frame(Model = "Baseline",
+                        MAE  = numeric(1),
+                        MAPE = numeric(1),
+                        R_Squared = numeric (1),
+                        R_Squared_adj = numeric(1))
+
+# MAE berechnen
+evaluation[evaluation$Model == "Baseline",]$MAE = mean(abs(AHL_externals$IFR - AHL_externals$Baseline))
+
+# MAPE berechnen
+evaluation[evaluation$Model == "Baseline",]$MAPE = mape(AHL_externals$IFR, AHL_externals$Baseline)
+
+# R-Squared berechnen
+evaluation[evaluation$Model == "Baseline",]$R_Squared = ""
+
+# R-Squared_Adj berechnen
+evaluation[evaluation$Model == "Baseline",]$R_Squared_adj = ""
+
+
+evaluation
+
+
+
+```
+
+### (9)
+Teilen Sie das Dataframe Ihres gewaehlten Warehousing‐Logistikdienstleisters in ein Trainings‐ (80%) und ein Test‐Set (20%) auf. Geben Sie von beiden den Tabellenkopf aus. Setzen Sie vorher den Seed 4141. Bewer‐ tungsrelevant: Code, Output.
+
+
+```{r}
+
+set.seed(4141)
+
+#Zufällig gezogenes Sample erstellen
+zufall = sample(1:nrow(AHL_externals), nrow(AHL_externals) * 0.8)
+
+AHL_externals_training = AHL_externals[zufall, ]
+
+rownames(AHL_externals_training) = NULL
+
+head(AHL_externals_training) 
+
+AHL_externals_test = AHL_externals[-zufall, ]
+
+rownames(AHL_externals_test) = NULL
+
+# Ausgabe ohne Rundung der Werte, da  auch mit den genauen Werten weitergerechnet wird
+head(AHL_externals_test)
+
+
+
+```
+
+### (10)
+Wenden Sie die Forward Selection Variante der Wrapper Methode an (siehe Vorlesung). D.h. erstellen Sie zunaechst alle uni‐variaten Modelle, bewerten Sie diese Modelle und waehlen Sie das Modell mit der besten Bewertung aus. Erstellen Sie ‐ basierend auf dem besten Modell der ersten Iteration ‐ alle bi‐variaten Mod‐ elle (das Modell der vorherigen Wrapper‐Iteration wird jeweils um eine Variable erweitert), bewerten Sie diese Modelle und waehlen Sie das Modell mit der besten Bewertung aus. Fuehren Sie dies so lange fort, bis keine Verbesserung mehr erreicht wird. Nutzen Sie zur Modellierung die lineare Regression. Bewerten Sie die Mod‐ elle entsprechend nach MAE und MAPE sowie nach regressionsspezifischen Kennzahlen. Nutzen Sie nur die 5 externen Faktoren als Features, die Sie oben als am staerksten korrelierende externe Faktoren identifiziert haben. Kommentieren Sie Ihr Vorgehen zwischen den Iterationen. Bewertungsrelevant: Output, Vorgehen (einschliesslich Kommentare).
+Hinweis: Tritt eine starke Multikollinearität (“strong multicollinearity”) auf, so koennen Sie alle Mod‐ ellierungen mit der entsprechenden Variablen‐Kombination unter Bezug auf diesen Hinweis auslassen (siehe Vorlesungsinhalte zu Korrelation).
+ 4
+Hinweis 2: Fuer das Erstellen der Modelle reicht es aus, zunaechst die Trainings‐Daten zu nutzen. Ueber‐ pruefen Sie ihr endgueltiges Modell jedoch am Ende auf Overfitting, indem Sie die Test‐Daten nutzen!
+
+#### Iteration 1
+```{r}
+# Modelle mit Trainings-Sets erstellen und anzeigen
+model_1 = lm(IFR ~ ParkingSpaceAvailability, data = AHL_externals_training)
+model_2 = lm(IFR ~ RoadCondition, data = AHL_externals_training)
+model_3 = lm(IFR ~ Temperature_C, data = AHL_externals_training)
+model_4 = lm(IFR ~ Sunshine_h, data = AHL_externals_training)
+model_5 = lm(IFR ~ Inflation, data = AHL_externals_training)
+
+
+summary(model_1)
+summary(model_2)
+summary(model_3)
+summary(model_4)
+summary(model_5)
+
+```
+
+**Regressionsbewertung:** Unabhaengige Variablen sind signifikant und haben ein R^2 und adjusted R^2 zwischen 0.1 und 0.22.
+
+Modelle bewerten:
+(1) Residuenplots
+
+```{r}
+# Residuenplot 1
+ggplot(data = NULL, aes(x = model_1$model$ParkingSpaceAvailability, y = model_1$residuals)) + 
+  geom_point() + 
+  geom_smooth(se = FALSE, method = loess)
+
+# Residuenplot 2
+ggplot(data = NULL, aes(x = model_2$model$RoadCondition, y = model_2$residuals)) + 
+  geom_point() + 
+  geom_smooth(se = FALSE, method = loess)
+
+# Residuenplot 3
+ggplot(data = NULL, aes(x = model_3$model$Temperature_C, y = model_3$residuals)) + 
+  geom_point() + 
+  geom_smooth(se = FALSE, method = loess)
+
+# Residuenplot 4
+ggplot(data = NULL, aes(x = model_4$model$Sunshine_h, y = model_4$residuals)) + 
+  geom_point() + 
+  geom_smooth(se = FALSE, method = loess)
+
+# Residuenplot 5
+ggplot(data = NULL, aes(x = model_5$model$Inflation, y = model_5$residuals)) + 
+  geom_point() + 
+  geom_smooth(se = FALSE, method = loess)
+```
+Residuenplots sehen soweit gut aus.  
+
+(2) Fehlerkennzahlen (fuer Trainings-Set):
+```{r}
+# Data Frame erweitern
+evaluation = rbind(evaluation, data.frame(Model = c("Model1","Model2","Model3","Model4","Model5"),
+                                            MAE = numeric(1),
+                                            MAPE = numeric(1),
+                                            R_Squared = numeric (1),
+                                            R_Squared_adj = numeric(1)))
+
+# MAE berechnen
+evaluation[evaluation$Model == "Model1",]$MAE = mean(abs(model_1$residuals))
+evaluation[evaluation$Model == "Model2",]$MAE = mean(abs(model_2$residuals))
+evaluation[evaluation$Model == "Model3",]$MAE = mean(abs(model_3$residuals))
+evaluation[evaluation$Model == "Model4",]$MAE = mean(abs(model_4$residuals))
+evaluation[evaluation$Model == "Model5",]$MAE = mean(abs(model_5$residuals))
+
+# MAPE berechnen
+evaluation[evaluation$Model == "Model1",]$MAPE = mape(model_1$model$IFR, model_1$fitted.values)
+evaluation[evaluation$Model == "Model2",]$MAPE = mape(model_2$model$IFR, model_2$fitted.values)
+evaluation[evaluation$Model == "Model3",]$MAPE = mape(model_3$model$IFR, model_3$fitted.values)
+evaluation[evaluation$Model == "Model4",]$MAPE = mape(model_4$model$IFR, model_4$fitted.values)
+evaluation[evaluation$Model == "Model5",]$MAPE = mape(model_5$model$IFR, model_5$fitted.values)
+
+
+# R-Squared berechnen
+evaluation[evaluation$Model == "Model1",]$R_Squared = summary(model_1)$r.squared
+evaluation[evaluation$Model == "Model2",]$R_Squared = summary(model_2)$r.squared
+evaluation[evaluation$Model == "Model3",]$R_Squared = summary(model_3)$r.squared
+evaluation[evaluation$Model == "Model4",]$R_Squared = summary(model_4)$r.squared
+evaluation[evaluation$Model == "Model5",]$R_Squared = summary(model_5)$r.squared
+
+# R-Squared_Adj berechnen
+evaluation[evaluation$Model == "Model1",]$R_Squared_adj = summary(model_1)$adj.r.squared
+evaluation[evaluation$Model == "Model2",]$R_Squared_adj = summary(model_2)$adj.r.squared
+evaluation[evaluation$Model == "Model3",]$R_Squared_adj = summary(model_3)$adj.r.squared
+evaluation[evaluation$Model == "Model4",]$R_Squared_adj = summary(model_4)$adj.r.squared
+evaluation[evaluation$Model == "Model5",]$R_Squared_adj = summary(model_5)$adj.r.squared
+
+# Fehler anzeigen
+evaluation
+```
+
+Alle Modelle weisen verbesserte Fehlerkennzahlen im Vergleich zur Baseline auf. Modell 1 schneidet bei den Fehlerkennzahlen am besten ab, während Modell 2 in den R^2 und R^2 adjusted Werten dominiert. Wir machen mit Modell 1 weiter.
+
+
+#### Iteration 2
+
+Bivariate Modelle erstellen:
+Die Variablen Temperature_C und Sunshine_h haben eine starke Multikollinearität mit der Variable ParkingSpaceAvailability und IFR. Daher werden diese Variablenkombination nicht weiter betrachtet.
+
+```{r}
+# Modelle mit Trainings-Sets erstellen und anzeigen
+model_12 = lm(IFR ~ ParkingSpaceAvailability + RoadCondition, data = AHL_externals_training)
+model_15 = lm(IFR ~ ParkingSpaceAvailability + Inflation, data = AHL_externals_training)
+
+
+summary(model_12)
+summary(model_15)
+
+```
+**Regressionsbewertung:** Unabhaengige Variablen von Modell 12 sind nicht signifikant, Multiple R-squared:  0.294,	Adjusted R-squared:  0.2692. 
+Unabhaengige Variablen von Modell 15 sind signifikant, Multiple R-squared:  0.3995,	Adjusted R-squared:  0.3784.
+
+Modelle bewerten:
+(1) Residuenplots (die Variablen wurden schon ueberprueft)
+
+(2) Fehlerkennzahlen (fuer Trainings-Set):
+```{r}
+# Data Frame erweitern
+evaluation = rbind(evaluation, data.frame(Model = c("Model12","Model15"),
+                                            MAE = numeric(1),
+                                            MAPE = numeric(1),
+                                            R_Squared = numeric (1),
+                                            R_Squared_adj = numeric(1)))
+
+# MAE berechnen
+evaluation[evaluation$Model == "Model12",]$MAE = mean(abs(model_12$residuals))
+evaluation[evaluation$Model == "Model15",]$MAE = mean(abs(model_15$residuals))
+
+# MAPE berechnen
+evaluation[evaluation$Model == "Model12",]$MAPE = mape(model_12$model$IFR, model_12$fitted.values)
+evaluation[evaluation$Model == "Model15",]$MAPE = mape(model_15$model$IFR, model_15$fitted.values)
+
+
+
+# R-Squared berechnen
+evaluation[evaluation$Model == "Model12",]$R_Squared = summary(model_12)$r.squared
+evaluation[evaluation$Model == "Model15",]$R_Squared = summary(model_15)$r.squared
+
+
+# R-Squared_Adj berechnen
+evaluation[evaluation$Model == "Model12",]$R_Squared_adj = summary(model_12)$adj.r.squared
+evaluation[evaluation$Model == "Model15",]$R_Squared_adj = summary(model_15)$adj.r.squared
+
+
+# Fehler anzeigen
+evaluation
+```
+
+Alle Modelle weisen verbesserte Fehlerkennzahlen im Vergleich zu Modell 1 auf. Modell 15 dominiert in allen 4 Bewertungskriterien. Es wird mit diesem Modell fortgefahren.
+
+#### Iteration 3
+
+Trivariate Modelle erstellen:
+
+
+```{r}
+#Modelle mit Trainings-Sets erstellen
+model_152 = lm(IFR ~ ParkingSpaceAvailability + Inflation + RoadCondition, data = AHL_externals_training)
+
+#Modelle anzeigen
+summary(model_152)
+```
+**Regressionsbewertung:** Bei Modell 152 hat RoadCondition keine Signifikanz mehr. Die R^2 und R^2 adjusted Werte sind Multiple R-squared:  0.4007,	Adjusted R-squared:  0.3686. 
+
+
+Modelle bewerten:
+(1) Residuenplots (Variablen wurden schon ueberprueft)
+
+(2) Fehlerkennzahlen (fuer Trainings-Set):
+```{r}
+# Data Frame erweitern
+evaluation = rbind(evaluation, data.frame(Model = c("Model152"),
+                                            MAE = numeric(1),
+                                            MAPE = numeric(1),
+                                            R_Squared = numeric (1),
+                                            R_Squared_adj = numeric(1)))
+
+# MAE berechnen
+evaluation[evaluation$Model == "Model152",]$MAE = mean(abs(model_152$residuals))
+
+# MAPE berechnen
+evaluation[evaluation$Model == "Model152",]$MAPE = mape(model_152$model$IFR, model_12$fitted.values)
+
+
+
+# R-Squared berechnen
+evaluation[evaluation$Model == "Model152",]$R_Squared = summary(model_152)$r.squared
+
+
+# R-Squared_Adj berechnen
+evaluation[evaluation$Model == "Model152",]$R_Squared_adj = summary(model_152)$adj.r.squared
+
+
+# Fehler anzeigen
+evaluation
+```
+
+Modell 152 ist in den Fehlerkennzahlen und R^2 adjusted leicht schlechter als Model 15. Nur in dem Bewertungskriterium R^2 ist das Modell marginal besser als Model 15. Daher wird sich für das Model 15 entschieden und die Wrappermethode damit beendet.
+
+#### Test auf Overfitting
+```{r}
+# Vorhersage treffen
+pred15 = predict(model_15, newdata = AHL_externals_test)
+
+# Data Frame erweitern
+evaluation = rbind(evaluation, data.frame(Model = "Model15_test",
+                                            MAE = numeric(1),
+                                            MAPE = numeric(1),
+                                            R_Squared = numeric (1),
+                                            R_Squared_adj = numeric(1)))
+
+# MAE berechnen
+evaluation[evaluation$Model == "Model15_test",]$MAE = mean(abs(AHL_externals_test$IFR -pred15))
+
+# MAPE berechnen
+evaluation[evaluation$Model == "Model15_test",]$MAPE = mape(AHL_externals_test$IFR, pred15)
+
+# R-Squared berechnen
+evaluation[evaluation$Model == "Model15_test",]$R_Squared = ""
+
+# R-Squared_Adj berechnen
+evaluation[evaluation$Model == "Model15_test",]$R_Squared_adj = ""
+
+evaluation$MAE = round(evaluation$MAE, 3)
+evaluation$MAPE = round(evaluation$MAPE, 3)
+evaluation$R_Squared = round(as.numeric(evaluation$R_Squared), 3)
+evaluation$R_Squared_adj = round(as.numeric(evaluation$R_Squared_adj), 3)
+
+# Fehler anzeigen
+evaluation[c(1,2,8,10),]
+
+```
+Da die Fehlerkennzahlen sich nicht verschlechtert haben, scheint kein Overfitting vorzuliegen.
+
+**Fazit:** Nach 3 Iterationen ist das Modell 15 als bestes Modell hervorgegangen. Wir konnten unsere Fehlerkennzahlen gegenueber der Baseline stark verbessern und konnten ein Bestimmtheitsmass von ca. 0.4 erreichen.  
+
+
+### (11)
+Bewerten Sie ihr Modell quantitativ im Vergleich mit der Baseline. Bewertungsrelevant: Output, Kommentar.
+
+```{r}
+#Nur die Bewertung der Baseline und Model 15 ausgeben:
+final_evaluation = evaluation[c(1,8),]
+final_evaluation
+cat("Das Model 15 reduziert den MAE um",round((1-final_evaluation[2,2]/final_evaluation[1,2])*100,1),"% gegenüber der Baseline.\n")
+cat("Der MAPE wird um",round((1-final_evaluation[2,3]/final_evaluation[1,3])*100,1),"% gegenüber der Baseline verringert.\n")
+cat("Mit einem R^2-Wert von",round(final_evaluation[2,4], 2),"ist die Aussagekraft des Modells außerdem akzeptabel.")
+```
+Kommentar: Die Fehlerkennzahlen MAE und MAPE konnten 
+
+### (12)
+Ihre Chefin kommt auf der Firmenfeier zu Ihnen und schlaegt Ihnen eine Wette vor. Sie sagt: “Ich wette mit Ihnen um 100 Euro, dass die durchschnittliche IFR des oben betrachteten WH‐DL im Dezember 2021 in jeder Region ueber 0.85 sein wird.” Sollten Sie die Wette eingehen? Bewertungsrelevant: Output, Kommentar.
+
+```{r}
+#Dataframe anlegen:
+IFR_Dez12 = data.frame(Region = "",
+                       ParkingSpaceAvailability = numeric(1),
+                       Inflation = numeric(1),
+                       predicted_IFR = numeric(1))
+#ParkingSpaceAvailability für jede Region in Periode 2021/12 ins Dataframe hinzufügen:
+IFR_Dez12[1:5,1:2] = aggregate(ParkingSpaceAvailability ~ region, data = externals[externals$Period=="2021/12",],mean)
+#Inflation für jede Region in Periode 2021/12 ins Dataframe hinzufügen:
+IFR_Dez12[,3] = aggregate(Inflation ~ region, data = externals[externals$Period=="2021/12",],mean)[,2]
+#Vorhersage basierend auf Model 15 berechnen:
+IFR_Dez12[,4] = predict(model_15,IFR_Dez12[,2:3])
+#Dataframe formatieren:
+rownames(IFR_Dez12) = NULL
+IFR_Dez12$predicted_IFR = round(IFR_Dez12$predicted_IFR,3)
+IFR_Dez12
+```
+Kommentar:
+Laut des von uns erstellten Modells, ist die IFR in allen Regionen in der Periode 2021/12 unter 0,85. Deshalb würden wir die Wette nicht eingehen.
+
+### (13)
+Ihr Regressionsmodell soll im kommenden Jahr implementiert und langfristig in die Unternehmensprozesse integriert
+werden. Beschreiben Sie, welche Nutzer und Prozesse davon profitieren koennten und in welcher Form die Loesung bereitgestellt werden koennte. Nehmen Sie ausserdem ausfuehrlich zur Phase der Datenbeschaffung Stellung. Bewertungsrelevant: Kommentar.
+
+Kommentar: Es könnte ein Dashboard geben, auf dem Live die Vorhersage für die IFR angezeigt wird. Mithilfe der Vorhersagen könnte die IFR aus Perspektive des letzten Glieds der Lieferkette gegen 1 gebracht werden, indem am Anfang der Lieferkette mehr losgeschickt wird als bestellt wird. Für die Vorhersage der IFR werden Vorhersagen der Inflation und Parkplatzverfügbarkeit benötigt. Für eine Prognose der Inflation gibt es viele gut zugänglichen Quellen im Internet (siehe: https://de.statista.com/statistik/daten/studie/5851/umfrage/prognose-zur-entwicklung-der-inflationsrate-in-deutschland/). Für die Prognose der Parkplatzverfügbarkeit sieht das jedoch schwieriger aus. Es gibt bereits Anbieter die mithilfe von Künstlicher Intelligenz diesen Einfluss vorhersagen (siehe: https://gobeta.de/projekte/aipark-artificial-intelligence-based-parking/). Es wäre eine Kooperation in Form der Bereitstellung einer API denkbar.
+
+
+
+
+
+
+
+

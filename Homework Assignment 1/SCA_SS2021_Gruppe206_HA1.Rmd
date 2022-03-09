@@ -1,0 +1,573 @@
+---
+title: "HA1_Markt2"
+author: "Carlo Schmid, Ronny Georgi"
+date: "5/06/2021"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Hausaufgabe 1 - Markt 2
+
+
+
+
+## Aufgabe 1.1
+
+  
+### (1)
+
+Importieren Sie alle 4 Dateien und speichern Sie diese als Variablen mit passenden Namen. Geben Sie eine Zusammenfassung von jeder Variable aus. Bewertungsrelevant: Input, Output.
+
+```{r}
+transaktionen = read.csv2("output_transactions_8Players_v0013.csv")
+service = read.csv2("output_services_8Players_v0013.csv")
+preise = read.csv2("output_prices_8Players_v0013.csv")
+kosten = read.csv2("output_cost_8Players_v0013.csv")
+
+cat("Zusammenfassung der Variablen der Transaktionsdaten:\n\n")
+summary(transaktionen)
+cat("\n Zusammenfassung der Variablen der Servicedaten:\n\n")
+summary(service)
+cat("\n Zusammenfassung der Variablen der Preisdaten:\n\n")
+summary(preise)
+cat("\n Zusammenfassung der Variablen der Kostendaten:\n\n")
+summary(kosten)
+```
+
+  
+  
+### (2)
+
+Bereinigen Sie die Daten, in dem Sie saemtliche Spalten aller Dataframes in das passende Datenformat umwandeln. Entfernen Sie ausserdem alle Datenpunkte, die ausserhalb der Zeitspanne von 2016 bis 2020 liegen. Geben Sie anschliessend erneut die 4 Zusammenfassungen aus. Bewertungsrelevant: Output.
+
+```{r}
+# Region in den Transaktionsdaten in Factor-Datentyp umwandeln:
+transaktionen$region = as.factor(transaktionen$region)
+transaktionen$date <- paste(transaktionen$Year, transaktionen$Month, transaktionen$Day, sep= "-")
+transaktionen$date = as.Date(transaktionen$date)
+
+# alle Datenpunkte die ausserhalb der Zeitspanne von 2016 bis 2020 liegen entfernen:
+transaktionen = transaktionen[transaktionen$Year<="2020",]
+
+# Region, Storename, Product, Vendor und Service in den Servicedaten in Factor-Datentyp umwandeln:
+# die Spalten Year, Month , Day zu einer neuen Spalte zusammenfügen und in Date-Datentyp umwandeln:
+service$region = as.factor(service$region)
+service$storename = as.factor(service$region)
+service$Product = as.factor(service$Product)
+service$vendor = as.factor(service$vendor)
+service$service = as.factor(service$service)
+service$date <- paste(service$Year, service$Month, service$Day, sep= "-")
+service$date = as.Date(service$date)
+
+
+
+# Vendor und Service in den Preisdaten in Factor-Datentyp umwandeln:
+preise$vendor = as.factor(preise$vendor)
+preise$service = as.factor(preise$service)
+
+# Product in den Productdaten in Factor-Datentyp umwandeln:
+kosten$Product = as.factor(kosten$Product)
+kosten$Product = as.factor(kosten$Product)
+
+#Zusammenfassung aller Variablen ausgeben lassen:
+cat("Zusammenfassung der Variablen der Transaktionsdaten:\n\n")
+summary(transaktionen)
+cat("\n Zusammenfassung der Variablen der Servicedaten:\n\n")
+summary(service)
+cat("\n Zusammenfassung der Variablen der Preisdaten:\n\n")
+summary(preise)
+cat("\n Zusammenfassung der Variablen der Kostendaten:\n\n")
+summary(kosten)
+```
+
+### (3)
+
+Extrahieren Sie aus den Transaktionsdaten eine Tabelle aller existierenden Produkte, in der jedes Produkt nur einmal enthalten ist. Beachten Sie ggf. diesen Link. Bewertungsrelevant: Input, Output.
+
+```{r}
+produkte = data.frame(data.frame(table(transaktionen$Product))[,1])
+colnames(produkte) = c("Produkte")
+# -------------------------- Mit Anzahl der Transaktionen: ------------------------------------------
+#colnames(produkte) = c("Produkt","Anzahl Transaktionen")
+produkte                      
+```
+
+### (4)
+
+Extrahieren Sie aus den Servicedaten eine Tabelle aller 20 Logistikdienstleister mit samt deren Dienstleistungen. Jeder Logistikdienstleister soll in der Liste nur einmal enthalten sein. Sortieren Sie die Tabelle nach Shipping‐DL und Warehousing‐DL. Bewertungsrelevant: Input, Output.
+
+```{r}
+
+#Erstellen eines Dataframe, der die Logistikdienstleister und deren Dienstleistungen wiedergibt.
+vendors1 = data.frame(Logistikdienstleister = service$vendor,Dienstleistung = service$service)
+
+unique(vendors1[order(vendors1$Dienstleistung),])
+
+```
+
+### (5)
+
+Extrahieren Sie aus den Transaktionsdaten eine Tabelle aller existierenden Supermaerkte in China, in der jeder Supermarkt nur einmal enthalten ist. Bewertungsrelevant: Input, Output.
+
+```{r}
+stores = data.frame(table(transaktionen$storename))
+colnames(stores) = c("Store","Transaktionen")
+stores["Store", drop=FALSE]
+
+
+
+
+```
+
+### (06)
+
+Wie viele Flaschen Limonade haben Sie im gesamten Zeitraum verkauft? Welchem Marktanteil (an der tatsaechlich verkauften Menge) entspricht dies? Bewertungsrelevant: Output.
+
+```{r}
+#Verkäufe von Gruppe206 aufsummieren:
+sales_206 = aggregate(Sales~Product,data = transaktionen,sum)
+sales_206 = sales_206[sales_206$Product == "Gruppe206",c("Sales")]
+cat("Es wurden", sales_206,"Flaschen Limonade des Unternehmens Gruppe 206 verkauft.","\n")
+#Verkäufe von Gruppe206 durch Summe aller Verkäufe (ohne Lost Sales) teilen:
+marktanteil_206 = sales_206/sum(transaktionen[transaktionen$Product != "Lost Sales",c("Sales")]) * 100
+cat("Das Unternehmen Gruppe 206 hat einen Marktanteil von ", marktanteil_206,"%.","\n")
+```
+
+### (07)
+
+Erstellen Sie eine Tabelle, um einen Ueberblick ueber den Absatz Ihres Produktes in den 5 verschiedenen Regionen zu erhalten. Die Tabelle sollte folgende Spalten aufweisen: Anzahl an Bestellungen, Gesamtmenge, Durchschnittliche Menge pro Bestellung. Testen Sie mit einer anschliessenden Rechnung stichprobenartig fuer die Region Japan, ob die Zahlen in den Spalten stimmen. Bewertungsrelevant: Output, Kommentar. Hinweis: Eine Bestellung bezieht sich auf einen bestimmten Supermarkt, in einer bestimmten Region, in einer bestimmten Periode. Moeglicher Loesungsweg: Erstellen Sie verschiedene Dataframes und nutzen Sie die cbind‐Funktion.
+
+```{r}
+#Service Daten nach Gruppe 206 filtern
+service_206 = service[service$Product == "Gruppe206",]
+#Anzahl der Bestellungen pro Region zählen:
+bestellungen = data.frame(table(service_206$region))
+#Anzahl Bestellter Flaschen je Region für Product Gruppe206 aggregieren:
+gesamtmenge = aggregate(QScheduled~region,data = service[service$Product == "Gruppe206",],sum)
+#Durschnittliche Menge pro Bestellung aggregieren:
+av_bestellungen = aggregate(QScheduled~region,data = service[service$Product == "Gruppe206",],mean)
+
+
+#Spalten zusammenfügen:
+absatz_ueberblick = cbind(bestellungen,gesamtmenge[,2],av_bestellungen[,2])
+colnames(absatz_ueberblick) = c("Region","Bestellungen","Gesamtmenge","Durchschnittliche Menge pro Bestellung")
+absatz_ueberblick
+
+#Stichprobenartige Probe für Japan:
+bestellungen_japan = length(service_206[service_206$region == "Japan",1])
+cat("Kommentar:\n")
+cat("In Japan gab es",bestellungen_japan,"Bestellungen. Dies stimmt mit der Tabelle überein.","\n")
+gesamtmenge_japan = gesamtmenge[gesamtmenge$region =="Japan",2]
+cat("In Japan wurden",gesamtmenge_japan,"Flaschen bestellt. Dies stimmt mit der Tabelle überein.","\n")
+av_bestellungen_japan = av_bestellungen[av_bestellungen$region =="Japan",2]
+cat("In Japan wurden durschschnittlich",av_bestellungen_japan,"Flaschen bestellt. Dies stimmt mit der Tabelle überein.","\n")
+
+```
+
+### (08)
+
+Berechnen Sie fuer jedes Jahr den Anteil Ihres Produkts an der tatsaechlich verkauften Menge (in %). Interpretieren Sie die Werte. Bewertungsrelevant: Output, Kommentar.
+
+```{r}
+sales_206 = aggregate(Sales~Year,data = transaktionen[transaktionen$Product == "Gruppe206",],sum)
+sales_gesamt = aggregate(Sales~Year,data = transaktionen[transaktionen$Product != "Lost Sales",],sum)
+#Jahreszahlen in Marktanteiltabelle schreiben:
+marktanteil_206 = sales_206
+#Marktanteil berechnen:
+marktanteil_206[,2] = sales_206[,2] / sales_gesamt[,2] * 100
+colnames(marktanteil_206) = c("Jahr","Marktanteil in %")
+marktanteil_206
+```
+
+### (09)
+
+Berechnen Sie den durchschnittlichen Absatz Ihres Produkts je Kalendermonat. Nennen Sie daraufhin den Monat mit dem hoechsten durchschnittlichen Absatz. Bewertungsrelevant: Output, Kommentar.
+
+```{r}
+sales_month_206 = aggregate(Sales~Month,data = transaktionen[transaktionen$Product == "Gruppe206",],mean)
+sales_month_206
+hoechster_absatz_monat = sales_month_206[sales_month_206$Sales == max(sales_month_206),1]
+cat("Der höchste durchschnittliche Absatz tritt mit", max(sales_month_206),"Produkten im",hoechster_absatz_monat,"ten Monat des Jahres auf.","\n")
+```
+
+### (10)
+
+Berechnen Sie Ihren Gesamtumsatz, Ihre Gesamtkosten und Ihren Gesamtprofit im Betrachtungszeitraum. Bewertungsrelevant: Output.
+
+```{r}
+# Verwendung von Tabellen "Transaktionen" und "Kosten"
+SalesTotal = aggregate(Sales ~ Product, data = 
+                           subset(transaktionen, Product== "Gruppe206"), sum)
+
+#Berechnung Gesamtumsatz = GesamtSales * VerkaufspreisproFlasche(4,5 GE)
+Gesamtumsatz = SalesTotal$Sales * 4.5
+cat("Gesamtumsatz =",Gesamtumsatz,"GE")
+CostTotal = aggregate(Amount ~ Product, data = 
+                           subset(kosten, Product== "Gruppe206"), sum)
+cat("\n \n")
+Gesamtkosten = CostTotal$Amount
+cat("Gesamtkosten =",Gesamtkosten,"GE")
+
+cat("\n \n")
+Gesamtprofit = Gesamtumsatz - Gesamtkosten
+cat("Gesamtprofit =",Gesamtprofit,"GE")
+```
+
+### (11)
+
+Erstellen Sie eine Grafik, in der Ihr Profit fuer das Jahr 2020 auf Monatsebene dargestellt ist. Heben Sie die Monate mit dem groessten bzw. kleinsten Profit passend farbig hervor. Bewertungsrelevant: Output.
+
+```{r}
+# Laden der Library ggplot für die Datenvisualisierung
+library("ggplot2")
+
+#Aggregieren der Verkäufe pro Monat für das Jahr 2020 und Produktgruppe 206
+Sales2020base =  subset(transaktionen, (Product== "Gruppe206" & Year=="2020"))
+Sales2020 = aggregate(Sales ~ Month, data = Sales2020base, sum)
+
+#Berechnung des Umsatzes pro Monat und richtige Darstellung in Tabelle
+Revenue = Sales2020$Sales * 4.5
+Revenue2020 = cbind(Sales2020, Revenue)
+
+#Aggregieren der Kosten pro Monat für das Jahr 2020 und Produktgruppe 206
+Costs2020base =  subset(kosten, (Product== "Gruppe206" & Year=="2020"))
+Costs2020 = aggregate(Amount ~ Month, data = Costs2020base, sum)
+colnames(Costs2020) = c("Month","Costs")
+
+# Verschmelzung von "Umsatz" und "Kosten" Tabelle in eine gesamte "Profit" Tabelle
+Profit2020 <- merge (Revenue2020, Costs2020, by="Month")
+#Berechnung des konkreten Profits/Monat in einer neuen Spalte; Neue Spalten um Max und Min Profit herauszustellen
+Profit2020$Profit= Profit2020$Revenue - Profit2020$Costs
+Profit2020
+
+#Säulendiagramm mit Highlighten der "Min" und "Max" Monate
+ggplot(Profit2020, aes(x = Month, y = Profit, fill = Profit)) + geom_col() + labs(title= "Profit für das Jahr 2020") + scale_x_discrete(name = "Month", limits = c("1","2","3","4","5","6","7","8","9","10","11","12"))
+
+
+
+```
+
+### (12)
+
+Erstellen Sie eine Grafik, in der Ihre Kosten ueber den gesamten Zeitraum fuer Transportdienstleistungen abgebildet sind. Die Grafik soll einen Vergleich der Regionen ermoeglichen. Fuer jede Region soll ersichtlich werden: (1) Wie viel wurde fuer puenktliche Transportdienstleistungen ausgegeben und (2) wie viel wurde fuer verspaetete Transportdienstleistungen ausgegeben. Interpretieren Sie die Grafik. Bewertungsrelevant: Output, Kommentar.
+
+
+```{r}
+#Service Daten nach Product 206 filtern:
+service_206 = subset(service, Product== "Gruppe206")
+#Spalte "OnTime" hinzufügen und mit 1 füllen wenn pünktlich und mit 0 füllen wenn unpünktlich
+service_206$OnTime = service_206$DaysScheduled >= service_206$DaysExecuted
+
+#Kosten der pünktlichen Lieferungen in Shanghai pro Jahr:
+shangh_OnTime = aggregate(cost~Year,data = service_206[service_206$OnTime== "TRUE" 
+                                              & service_206$region == "Shangh",], sum)
+#Kosten der unpünktlichen Lieferungen in Shanghai pro Jahr:
+shangh_NotOnTime = aggregate(cost~Year,data = service_206[service_206$OnTime== "FALSE" 
+                                              & service_206$region == "Shangh",], sum)
+#Kosten der pünktlichen Lieferungen in Japan pro Jahr:
+japan_OnTime = aggregate(cost~Year,data = service_206[service_206$OnTime== "TRUE" 
+                                              & service_206$region == "Japan",], sum)
+#Kosten der unpünktlichen Lieferungen in Japan pro Jahr:
+japan_NotOnTime = aggregate(cost~Year,data = service_206[service_206$OnTime== "FALSE" 
+                                              & service_206$region == "Japan",], sum)
+#Kosten der pünktlichen Lieferungen in Peking pro Jahr:
+peking_OnTime = aggregate(cost~Year,data = service_206[service_206$OnTime== "TRUE" 
+                                              & service_206$region == "Peking",], sum)
+#Kosten der unpünktlichen Lieferungen in Peking pro Jahr:
+peking_NotOnTime = aggregate(cost~Year,data = service_206[service_206$OnTime== "FALSE" 
+                                              & service_206$region == "Peking",], sum)
+#Kosten der pünktlichen Lieferungen in Phlppn pro Jahr:
+phlppn_OnTime = aggregate(cost~Year,data = service_206[service_206$OnTime== "TRUE" 
+                                              & service_206$region == "Phlppn",], sum)
+#Kosten der unpünktlichen Lieferungen in Phlppn pro Jahr:
+phlppn_NotOnTime = aggregate(cost~Year,data = service_206[service_206$OnTime== "FALSE" 
+                                              & service_206$region == "Phlppn",], sum)
+#Kosten der pünktlichen Lieferungen in Skorea pro Jahr:
+skorea_OnTime = aggregate(cost~Year,data = service_206[service_206$OnTime== "TRUE" 
+                                              & service_206$region == "Skorea",], sum)
+#Kosten der unpünktlichen Lieferungen in Skorea pro Jahr:
+skorea_NotOnTime = aggregate(cost~Year,data = service_206[service_206$OnTime== "FALSE" 
+                                              & service_206$region == "Skorea",], sum)
+
+#Merge all 10 dataframes:
+region_service_costs <- merge(shangh_OnTime,shangh_NotOnTime,by="Year",all=TRUE)
+region_service_costs <- merge(region_service_costs,japan_OnTime,by="Year",all=TRUE)
+region_service_costs <- merge(region_service_costs,japan_NotOnTime,by="Year",all=TRUE)
+region_service_costs <- merge(region_service_costs,peking_OnTime,by="Year",all=TRUE)
+region_service_costs <- merge(region_service_costs,peking_NotOnTime,by="Year",all=TRUE)
+region_service_costs <- merge(region_service_costs,phlppn_OnTime,by="Year",all=TRUE)
+region_service_costs <- merge(region_service_costs,phlppn_NotOnTime,by="Year",all=TRUE)
+region_service_costs <- merge(region_service_costs,skorea_OnTime,by="Year",all=TRUE)
+region_service_costs <- merge(region_service_costs,skorea_NotOnTime,by="Year",all=TRUE)
+colnames(region_service_costs) = c("Year","shangh_OnTime","shangh_NotOnTime",
+                                   "japan_OnTime","japan_NotOnTime",
+                                   "peking_OnTime","peking_NotOnTime",
+                                   "phlppn_OnTime","phlppn_NotOnTime",
+                                   "skorea_OnTime","skorea_NotOnTime")
+
+head(region_service_costs)
+
+#Plot all 10 dataframes as lines:
+ggplot(data=region_service_costs, aes(x=Year)) +
+  geom_line(aes(y = shangh_OnTime, col="Shanghai",linetype="Pünktlich"))  +
+  geom_line(aes(y = shangh_NotOnTime, col="Shanghai",linetype="Nicht pünktlich")) +
+  geom_line(aes(y = japan_OnTime, col="Japan",linetype="Pünktlich"))  +
+  geom_line(aes(y = japan_NotOnTime, col="Japan",linetype="Nicht pünktlich"))  +
+  geom_line(aes(y = peking_OnTime, col="Peking",linetype="Pünktlich"))  +
+  geom_line(aes(y = peking_NotOnTime, col="Peking",linetype="Nicht pünktlich"))  +
+  geom_line(aes(y = phlppn_OnTime, col="Phillipinen",linetype="Pünktlich"))  +
+  geom_line(aes(y = phlppn_NotOnTime, col="Phillipinen",linetype="Nicht pünktlich"))  +
+  geom_line(aes(y = skorea_OnTime, col="Südkorea",linetype="Pünktlich"))  +
+  geom_line(aes(y = skorea_NotOnTime, col="Südkorea",linetype="Nicht pünktlich")) +
+  xlab("Jahr") +
+  ylab("Kosten für Transportdienstleistungen in GE") +
+  labs(colour = "Region") +
+  labs(linetype = "Pünktlichkeit")
+  
+
+```
+
+Interpretation der Grafik: 
+Die Kosten für pünktliche und nicht pünktliche Lieferungen sind in der Region Peking am größten. 
+In der Region Philippinen sind die Kosten für Transportdienstleistungen am niedrigsten, sowohl für pünktliche als auch nicht pünktliche Lieferungen.
+In Südkorea gab es zwischen 2017 und 2018 einen deutlichen Anstieg in den Kosten der pünktlichen Auslieferungen (~10%) während die nicht pünktlichen Auslieferungen weniger       Kosten verursacht haben (ca. 5 %). Da die Qualität der Leistung nicht Teil der Vereinbarung ist und wir weder Rabatte bekommen noch Vertragsstrafen vereinbaren können, 
+müssten hier genaue Ursachen weiter untersucht werden. Es könnte auch sein, dass sich durch externe Fakotren das Verhältnis von pünktlichen zu unpünktlichen Auslieferungen in    diesem zeitabschnitt abrupt verändert hat. Insgesamt sind die zeitlichen Verläufe der Transportkosten über die 4 Jahre 2016-2020 für alle 5 Regionen relativ gleichgeblieben.
+
+
+### (13)
+
+Berechnen Sie, wie viel Sie die reale Ausfuehrung einer Lagerdienstleistung tatsaechlich kostet. D.h. rechnen Sie die Gesamtkosten, die Ihr Produkt/Gruppe fuer Qscheduled erzeugt hat, auf die tatsaechliche Lagerleistung (QExecuted) um. (1) Geben Sie die Kosten pro Stueck an. (2) Berechnen Sie anschliessend, wie viel Prozent Sie mehr bezahlt haben (bei einem Vergleich von Kosten QExecuted pro Steuck zu Kosten QScheduled pro Stueck). Bewertungsrelevant: Output.
+
+```{r}
+# Aufsummierung der Lieferungskosten für unsere Produktgruppe
+CostDelivery = aggregate(cost ~ Product, data = 
+                           subset(service, Product== "Gruppe206"), sum)
+QScheduled = aggregate(QScheduled ~ Product, data = 
+                           subset(service, Product== "Gruppe206"), sum)
+CostDelivery$QScheduled = QScheduled$QScheduled 
+
+QExecuted = aggregate(QExecuted ~ Product, data = 
+                           subset(service, Product== "Gruppe206"), sum)
+CostDelivery$QExecuted = QExecuted$QExecuted
+CostDelivery
+
+#Berechnungen der einzelnen Kostenfaktoren pro ausgelieferte Ware 
+CostQSched = CostDelivery$cost / CostDelivery$QScheduled
+CostQExec = CostDelivery$cost / CostDelivery$QExecuted 
+CostQDiff = (CostQExec - CostQSched) /CostQSched * 100
+ 
+# Ausgabe der erwünschten Kostenfaktoren
+cat("Die Stückkosten für die Lagerdienstleistung die geplant abgefertigt werden sollte, betraegt: ","\n",round(CostQSched, 2), "Geldeinheiten.", "\n")
+cat("\n")
+cat("Die Stückkosten für die Lagerdienstleistung die tatsächlich werden sollte, betraegt: ","\n",round(CostQExec, 2), "Geldeinheiten.", "\n")
+
+cat("\n")
+cat("Anteil pro Stück mehr bezahlt:")
+cat("\n")
+cat("Es wurden",round(CostQDiff,2), "% mehr bezahlt.")
+```
+
+### (14)
+
+Waehlen Sie eine geeignete Kennzahl zur Bewertung Ihrer Shipping‐Dienstleister. Beachten Sie dabei, was die Qualiteat der Shipping‐Dienstleister ausmacht. Begruenden Sie die Wahl der Kennzahl kurz. Berechnen Sie diese Kennzahl zunaechst fuer alle Dienstleistungen als zusaetzliche Variable der Services Tabelle, d.h. fuer jede einzelne Dienstleistung. Berechnen Sie anschliessend die durchschnittliche Kennzahl der Shipping‐Dienstleister fuer die Dienstleistungen an Ihrem Produkt ueber die gesamte Laufzeit (5 Jahre). Geben Sie Ihre Ergebnisse in einer Tabelle aus, in der die Kennzahl‐Werte absteigend sortiert sind. Bewertungsrelevant: Begruendung, Code, Output.
+
+Antwort: Zur Bewertung der Shipping-Diensleister verwenden wir die On-time Delivery Rate. Diese Kennzahl eignet sich hier sehr gut, da die Qualitaet der Shipping‐Dienstleister dadurch beeintraechtigt ist, dass die vereinbarte Lieferzeit von 2 Tagen oft ueberschritten wird
+
+```{r}
+
+# Hinzufuegen der Verspaetung als Variable in der Service Tabelle
+service$Verspaetung = service$DaysExecuted - service$DaysScheduled
+
+
+# Berechnen der On-Time Delivery Rate (OTD)
+# Wenn der Verspaetung <= 0 ist, hat der Shipping-Dienstleister die vereinbarte Lieferzeit eingehalten 
+service$OTD = service$Verspaetung <= 0
+
+#Mittelwert der OTD Rate über die verschiedenen Shipping_Dienstleister für alle Produkte
+Durchschnittliche_OTD = sort(round(tapply(service$OTD*100, service$vendor, 
+                                          mean), 2), decreasing = FALSE)
+
+
+# Erstellen eines Subsets, das nur Produkt 206 enthaelt und nur Shipping-Services betrachtet
+subsetShipping = subset(service, Product == "Gruppe206" & 
+                          service == "Shipping")
+
+
+
+# Mittelwert der OTD Rate über die verschiedenen Shipping-Dienstleister für unser Produkt 206 aufsteigendsortiert und gerundet
+Durchschnitt_OTD206_inPercent = sort(round(tapply(subsetShipping$OTD*100, subsetShipping$vendor, 
+                                          mean), 2), decreasing = FALSE)
+
+data.frame(Durchschnitt_OTD206_inPercent)
+
+
+```
+
+### (15)
+
+Waehlen Sie eine geeignete Kennzahl zur Bewertung Ihrer Warehousing‐Dienstleister. Beachten Sie dabei, was die Qualiteat der Warehousing‐Dienstleister ausmacht. Begruenden Sie die Wahl der Kennzahl kurz. erechnen Sie diese Kennzahl zunaechst fuer alle Dienstleistungen als zusaetzliche Variable der Services‐Tabelle, d.h. fuer jede einzelne Dienstleistung. Berechnen Sie anschliessend die durchschnittliche Kennzahl fuer die Warehousing‐Dienstleister fuer die Dienstleistungen an Ihrem Produkt ueber die gesamte Laufzeit (5 Jahre). Geben Sie Ihre Ergebnisse in einer Tabelle aus, in der die Kennzahl‐Werte absteigend sortiert sind. Bewertungsrelevant: Begruendung, Code, Output.
+
+Antwort: Zur Bewertung der Warehousing-Dienstleister verwenden wir die Item Fill Rate. Die Qualitaet der Warehousing‐Dienstleister ist beeintraechtigt dadurch, dass diese in der Regel zu wenige Waren (Flaschen Limonalytics) auslagern, wodurch diese trotz ihrer Bestellung nicht im Regal der Supermaerkte verfuegbar sind. Diese Qualitätsabweichung kann mit der Item Fill Rate (IFR) ermittelt werden, welchen den Anteil der tatsächlich ausgelieferten Warenstücke von der Anzahl geplanter Auslieferungsstücke (Waren) bestimmt.
+
+```{r}
+# IFR = # Anzahl tatsächlich ausgelieferter Warenstücke an Kunde (QExecuted) / # Anzahl geplanter ausgelieferter Warenstücke an Kunde (QScheduled)
+
+# Berechnung der IFR fuer alle Dienstleistungen als zusaetzliche Variable der Service Tabelle
+service$IFR = service$QExecuted/service$QScheduled
+
+# Erstellen eines Subsets, das nur Produkt 206 enthaelt und nur Warehousing-Services
+WarehousingService = subset(service, Product == "Gruppe206" & service 
+                            == "Warehousing")
+
+# Berechnung der durchschnittlichen IFR fuer die Warehousing-Dienstleister
+IFRDienstleister = aggregate(IFR*100 ~ vendor, data = WarehousingService, mean)
+colnames(IFRDienstleister)= c("vendor", "IFR in %")
+
+# Runden der Spalte IFR und Ausgabe der Aggregation mit aufsteigender Sortierung
+IFRDienstleister[2] = round(IFRDienstleister[2],2)
+IFRDienstleister[order(IFRDienstleister$IFR),]
+
+```
+
+### (16)
+
+Visualisieren Sie in geeigneter Form die gewaehlte Qualitaetskennzahl der Warehouse‐Dienstleister in einem ggplot (bezogen auf alle Produkte). Durch die Visualisierung soll eine differenzierte Vergleichbarkeit der Dienstleister moeglich sein. Wie bewerten Sie die Qualitaet der Warehousing‐DL insgesamt? Bewertungsrelevant: Output, Kommentar.
+
+Kommentar: Zur Visualisierung eignet sich ein Boxplot, wei ldamit das Verteilungsspektrum der IFR pro Dienstleister sehr differenziert abgebildet wird. Man kann auch Werte ablesen, die sich zwischen \~ 0.81 und \~ 0.85 befinden.
+
+```{r}
+# Erstellen eines Boxplot ueber ein Subset der Services-Tabelle, das nur Warehousing-DL enthaelt
+ggplot(data = subset(service, service == "Warehousing"), 
+       # Wahl der x- und y-Achsen
+       aes(x = IFR, y = vendor)) + 
+  geom_boxplot()
+```
+
+Analyse des Boxplots: Insgesamt hat die Qualität der Warehouse-Dienstleister noch ein gutes Potenzial nach oben. Nach Angaben von interlogusa liegen sehr gute Werte für eine Item-Fill Rate zwischen 85-95%. (<https://www.interlogusa.com/answers/blog/importance-item-fill-rates-inventory-management/#>:\~:text=A%20good%20item%20fill%20rate,a%20cause%20for%20lost%20sales.) Die Werte zwischen den einzelnen Wh-Diensleistern varieren nicht so stark und liegen im Mittel zwischen 81 % und 85 %. Die höchste Item Fillrate hat im Schnitt der Dienstleister "CPS Warehousing" und die niedrigste "AHL Express Warehousing". 
+
+### (17)
+
+Visualisieren Sie in geeigneter Form die Qualitaetskennzahl der Shipping‐Dienstleister je Region in einem ggplot (bezogen auf alle Produkte). Wie bewerten Sie die Qualitaet der Shipping‐DL insgesamt? Bewertungsrelevant: Output, Kommentar.
+
+```{r}
+#Subsets definieren für die einzelnen Region für unser Produkt(206) und aus dem Shipping Bereich
+subsetShippingShangh = subset(service, Product == "Gruppe206" &  service == "Shipping" & region == "Shangh")
+subsetShippingJapan  = subset(service, Product == "Gruppe206" &  service == "Shipping" & region == "Japan")
+subsetShippingPeking = subset(service, Product == "Gruppe206" &  service == "Shipping" & region == "Peking")
+subsetShippingSkorea = subset(service, Product == "Gruppe206" &  service == "Shipping" & region == "Skorea")
+subsetShippingPhlppn = subset(service, Product == "Gruppe206" &  service == "Shipping" & region == "Phlppn")
+
+OTD_Shangh = aggregate(OTD~vendor,data=subsetShippingShangh,mean)
+OTD_Japan = aggregate(OTD~vendor,data=subsetShippingJapan,mean)
+OTD_Peking = aggregate(OTD~vendor,data=subsetShippingPeking,mean)
+OTD_Skorea = aggregate(OTD~vendor,data=subsetShippingSkorea,mean)
+OTD_Phlppn = aggregate(OTD~vendor,data=subsetShippingPhlppn,mean)
+
+OTD <- merge(OTD_Shangh,OTD_Japan,by="vendor")
+OTD <- merge(OTD,OTD_Peking,by="vendor")
+OTD <- merge(OTD,OTD_Skorea,by="vendor")
+OTD <- merge(OTD,OTD_Phlppn,by="vendor")
+colnames(OTD) = c("region","OTD_Shangh","OTD_Japan","OTD_Peking","OTD_Skorea","OTD_Phlppn")
+#Safe vendor names for the lables of the plot down below:
+vendor = OTD[,1]
+#OTD transformieren:
+OTD = data.frame(t(OTD))
+#Die Row names in erste Spalte umwandeln:
+OTD <- cbind(rownames(OTD), data.frame(OTD, row.names=NULL))
+#Copy first row into the colum names:
+colnames(OTD) = c(OTD[1,])
+#Delete first row:
+OTD = OTD[-1,]
+#Convert OTDs to numeric:
+OTD[,2:11] = sapply(OTD[,2:11], as.numeric)
+OTD[,2:11] = OTD[,2:11] *100
+#names(OTD)<-str_replace(names(OTD), c(" " = "_"))
+colnames(OTD) = make.names(colnames(OTD))
+OTD
+
+ggplot(data=OTD, mapping = aes(x = region)) +
+  geom_point(aes(y=AHL.Express.Shipping, col=vendor[1])) +
+  geom_point(aes(y=Bange.Hammer.Shipping, col=vendor[2])) +
+  geom_point(aes(y=CPS.Shipping, col=vendor[3])) +
+  geom_point(aes(y=DWL.Shipping, col=vendor[4])) +
+  geom_point(aes(y=EPD.Shipping, col=vendor[5])) +
+  geom_point(aes(y=Flying.Mercury.Shipping, col=vendor[6])) +
+  geom_point(aes(y=Gifter.Shipping, col=vendor[7])) +
+  geom_point(aes(y=HCX.Shipping, col=vendor[8])) +
+  geom_point(aes(y=IntEx.Shipping, col=vendor[9])) +
+  geom_point(aes(y=JNT.Shipping, col=vendor[10])) +
+  xlab("Region") +
+  ylab("On Time Delivery Rate in %") +
+  labs(colour = "Shipping-Dienstleister")
+
+```
+Kommentar:
+
+Bei Betrachtung der Leistung der Shippingdienstleister in den einzelnen Regionen kann eine eine ziemlich starke Streuung festgestellt werden. Für jede Region kristallisieren sich einzelne Shipping-Dienstleister heraus die regional eine besonders hohe On-Time Delivery Rate aufweisen oder im Vergleich zu den anderen Dienstleistern eine besonders niedrige.
+Für die folgenden Regionen kann man die Dienstleister mit der besten On-Time Delivery Rate feststellen: 
+Japan (Gifter Shipping), Peking (IntEx Shipping), Philippinen (IntEx Shipping/Gifter Shipping), Shanghai (CPS Shipping), Südkorea (JNT Shipping).
+Auffallend niedrig sind die OTD-Raten von DWL Shipping in Japan, AHL Express Shipping in Peking, AHL Express Shipping in Philippinen und Bange + Hammer Shipping in Südkorea.
+
+
+
+
+
+
+
+
+
+
+
+# Projektbeschreibung
+
+## Beschreibung der Ausgangssituation
+
+Das Produkt "Limonalytics" von unserer Gruppe 206 wird in Berlin hergestellt und über den Hamburger Hafen in die Regionen Peking (China I), Shanghai (China II), Südkorea, Japan, und die Philippinen verschifft und an den Häfen in gemietete Großlager eingelagert. Innerhalb jeder Region gibt es 5 Supermärkte, die unser Produkt "Limonalytics" vertreiben. Die Nachfrage in den Supermärkten ist dynamisch ‐ aber unterschiedlich dynamisch. Die Verteilung der Kunden innerhalb der Märkte ist uns unbekannt. Die Nachfrage einer gesamten Region ist über die Supermärkte in der Region gleichverteilt.
+
+## Zielsetzung des Projekts
+
+Da die Distribution des Produkts aktüll chaotisch verläuft, ist das Ziel dieses Projekts eine transparente Analyse und Darstellung der bisherigen Prozesse auf deren Basis weitere Entscheidungen für oder gegen bestimmte Logistikdienstleister stattfinden sollen. Die Durchführung des Projekts erfolgt mithilfe der Programmiersprache R welcher in der Entwicklungsumgebung R Studio eingesetzt wird. Hierbei handelt es sich um eine kostenlose Open-Source-Software, die als Tool für Statistik, Visualisierung und statistische Programmierung dient.
+
+## Projektabschnitte
+
+### 1.  Problemidentifizierung 
+Die Distribution des Produktes verläuft chaotisch ab und muss auf Ineffizienzen geprüft werden und Abläufe müssen transparenter dargestellt werden. Die Logistikdienstleistungen werden kurzfristig auf dem Spotmarkt angefragt. Diese sind im Vergleich zu Kontraktleistungen teurer, werden aber nicht von Vertragsgebühren begleitet. Die Qualität der Warehousing‐Dienstleister ist beeinträchtigt dadurch, dass diese in der Regel zu wenige Waren auslagern, wodurch diese trotz ihrer Bestellung nicht im Regal der Supermärkte verfügbar sind. Die Qualität der Shipping‐Dienstleister ist beeinträchtigt dadurch, dass diese die vereinbarte Lieferzeit von 2 Tagen oft überschreiten.
+
+### 2.  Datenbeschaffung und -exploration 
+Für die Durchführung des Projektes müssen verschiedene interne und externe Daten herangezogen werden. Hierbei werden Daten zu Preisen, bezogenen Services, Transaktionen und Kosten seit Bestehen des Unternehmens (5 Jahre) herangezogen.\
+    Im Rahmen der Datenexploration werden erste Visualisierungen der Daten erzeugt. Diese dienen zur Gewinnung erster übergreifender Einblicke in die Daten und zur Identifikation erster Ansatzpunkte für tiefergehende Analysen. Muster sind durch deskriptive Statistik teilweise schwerer erkennbar, als bei visuellen Methoden.
+
+### 3.  Datenaufbereitung 
+In diesem Abschnitt werden die für die Modellierung identifizierten Daten in eine Form umgewandelt, welche für datenanalytische Techniken geeignet ist. Die Daten werden von Ausreißern und manuellen Fehlern bereinigt und mit Experten, die aus dem Quellbereich der Daten kommen abgesprochen und dokumentiert, um eine hohe Qualität der Daten zu ermöglichen. Die Datenaufbereitung bildet einen wichtigen Grundstein für die Analyse, da auf schlechte Datenqualität schlechte Modelle folgen. Dementsprechend nimmt die Datenaufbereitung den größten Teil der geplanten Arbeitszeit in Anspruch.
+
+### 4.  Datenanalyse 
+Im Rahmen der Datenanalyse werden Daten in Teilbereiche zerlegt und verschiedene Verhältnisse und statistische Gegebenheiten werden miteinander verglichen und gegenübergestellt, um so neue bzw. übersichtlichere Erkenntnisse aus bestehenden Datensätzen zu generieren. Dabei werden u.a. Nachfrage, Kosten und Profit für verschiedene Unterkategorien ermittelt. Der Fokus der Datenanalyse liegt auf dem Vergleich der Logistikdienstleister für Shipping und Warehousing anhand wichtiger Kennzahlen (KPIs). Durch die Visualisierung der Qualitätskennzahlen der Dienstleister über die Zeit und die verschiedenen Regionen, soll festgestellt werden wie stark sich die Qualität der Dienstleister unterscheidet und ob Schwankungen über die Zeit auftreten.
+
+### 5.  Ergebnisbewertung 
+Nach der Durchführung der Analyse soll eine Zusammenfassung und Bewertung der Ergebnisse folgen. Die daraus gewonnenen Erkenntnisse sollen nun an Führungskräfte kommuniziert werden und als Grundlage für weitere Entscheidungen dienen.
+
+### 6.  Bereitstellung 
+Zuletzt wird das Modell mit Code und Dokumentation als R‐Markdown Notebook als Rmd‐ sowie als PDF‐Datei übermittelt.
+
+## Stellungnahme zu Analyseergebnissen aus Aufgabe 1.1
+
+Der Marktanteil unseres Produktes der Gruppe 206 ist über die Jahre 2016-2020 ziemlich gleich geblieben (~12,4%)
+Für unseren Profit im letzten Jahr (2020) lässt sich eine sehr leichte saisonale Tendenz erkennen. Über die Wintermonate gab es im Schnitt weniger Profit und im Frühjahr und dem anfangenden Sommer ist der Profit etwas angestiegen. Dies könnte man zum Teil mit der generellen Abweichung der Nachfrage an Limonadengetränken im kälteren Winter (weniger) gegenüber dem Frühjar und heißeren Sommer (mehr) erklären. Eine weitere detailliertere Untersuchung der sich verändernden Kosten und Gewinne pro Monat wäre jedoch angebracht.
+
+Im Bezug auf die Shippingleistungen, sollten die Ursachen etwas näher beleuchtet werden, warum die Shipping Kosten in Peking deutlich höher sind im Vergleich zu Südkorea (billigste Region). Es gibt hier eine Kostendifferenz von ca. 37% für pünktliche Lieferungen und ca. 50% für unpünktliche Lieferungen (Peking  50% teuerer als Südkorea). Erste Vermutungen könnten darauf hindeuten, dass allein die extreme Enge in Peking und die vielen Menschenmassen, den Vollzug von Transportleistungen deutlich erschweren und deshalb Anbieter in dieser Region teurer sind. Für unser Produkt 206 weißt der Shipping Dienstleister "IntEx Shipping" mit ca. 47% die beste On-Time-Delivery Rate auf. Dieser Wert ist im Vergleich zum niedrigsten Anbieter "AHL Express Shipping" mit ca. 28% deutlich höher. Für zukünftige Shipping Diensleistungen, sollte der Dienstleister IntEx Shipping deutlich öfter in Betracht bezogen werden und der Dienstleister "AHL Express Shipping" sollte bei gleich bleibenden Verträgen mehr vermieden werden. Eine Neustrukturierung zu mehr leistungsorientierten Veträgen, gemäß der OTD Rate könnte hier sinnvoll sein.
+Die Erkenntnise der regionalen OTD Raten sollten bei einer möglichen Neustrukturierung der Veträge mit den Shippingdienstleistern berücksichtigt werden. Die Dienstleister mit den jeweils besten OTD Raten sollten in den einzelnen Regionen bevorzugt beauftragt werden. Verträge mit den Shipping Dienstleistern DWL, AHL Express, Bange + Hammer Peking und Philippinen sollten für die Regionen Japan, Peking, Philippinen und Südkorea nicht verlängert werden, wenn dies vetraglich möglich ist. Die Dienstleister weisen in diesen Regionen sehr niedrige OTD Raten auf, was zu hohen Verlusten führen kann. 
+
+Bei Betrachtung der Warehousing Dienstleister, scheint eine Neustrukturierung der Veträge orientiert an der tatsächlichen Warehousing Leistung gemäß der erbrachten Item-Fill Rate für sinnvoll. Die beste Item Fill Rate weißt der Dienstleister "CPS Warehousing" auf. Dieser sollte zukünftig wenn möglich am meisten für Warehousing Dienstleistungen genutzt werden. Die schlechteste Item Fill Rate weißt der Dienstleister "AHL Express "Warehousing" auf. Dieser sollte für zukünftige Warehousing Dienstleistungen eher vermieden werden oder seine Verträge sollten entsprechende zielgerichtete IFR Werte berücksichtigen.
+
+
+
+
+
+
+
